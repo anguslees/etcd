@@ -29,9 +29,9 @@ type clusterStore struct {
 	Store store.Store
 }
 
-func NewClusterStore(st store.Store, c Cluster) ClusterStore {
+func NewClusterStore(st store.Store, c *Cluster) ClusterStore {
 	cls := &clusterStore{Store: st}
-	for _, m := range c {
+	for _, m := range c.Members() {
 		cls.Add(*m)
 	}
 	return cls
@@ -60,7 +60,7 @@ func (s *clusterStore) Add(m Member) {
 // TODO(philips): keep the latest copy without going to the store to avoid the
 // lock here.
 func (s *clusterStore) Get() Cluster {
-	c := &Cluster{}
+	c := NewCluster()
 	e, err := s.Store.Get(machineKVPrefix, true, true)
 	if err != nil {
 		if v, ok := err.(*etcdErr.Error); ok && v.ErrorCode == etcdErr.EcodeKeyNotFound {

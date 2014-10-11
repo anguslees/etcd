@@ -76,23 +76,22 @@ func TestClusterStoreGet(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		c := Cluster{}
+		c := NewCluster()
 		err := c.AddSlice(tt.mems)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
-
 		cs := NewClusterStore(newGetAllStore(), c)
 
-		if g := cs.Get(); !reflect.DeepEqual(g, c) {
-			t.Errorf("#%d: mems = %v, want %v", i, g, c)
+		if g := cs.Get(); !reflect.DeepEqual(g, *c) {
+			t.Errorf("#%d: mems = %v, want %v", i, g, *c)
 		}
 	}
 }
 
 func TestClusterStoreDelete(t *testing.T) {
 	st := newStoreGetAllAndDeleteRecorder()
-	c := Cluster{}
+	c := NewCluster()
 	c.Add(newTestMember(1, nil, "node1", nil))
 	cs := NewClusterStore(st, c)
 	cs.Remove(1)

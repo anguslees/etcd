@@ -124,7 +124,7 @@ func NewServer(cfg *ServerConfig) *EtcdServer {
 			log.Fatal(err)
 		}
 		// TODO: add context for PeerURLs
-		n = raft.StartNode(m.ID, cfg.Cluster.IDs(), 10, 1)
+		n = raft.StartNode(m.ID, cfg.Cluster.ID(), cfg.Cluster.MemberIDs(), 10, 1)
 	} else {
 		if cfg.DiscoveryURL != "" {
 			log.Printf("etcd: warn: ignoring discovery URL: etcd has already been initialized and has a valid log in %q", waldir)
@@ -156,10 +156,10 @@ func NewServer(cfg *ServerConfig) *EtcdServer {
 		if info.ID != m.ID {
 			log.Fatalf("unexpected nodeid %x, want %x: nodeid should always be the same until we support name/peerURLs update or dynamic configuration", info.ID, m.ID)
 		}
-		n = raft.RestartNode(m.ID, cfg.Cluster.IDs(), 10, 1, snapshot, st, ents)
+		n = raft.RestartNode(m.ID, cfg.Cluster.MemberIDs(), 10, 1, snapshot, st, ents)
 	}
 
-	cls := NewClusterStore(st, *cfg.Cluster)
+	cls := NewClusterStore(st, cfg.Cluster)
 
 	s := &EtcdServer{
 		store:      st,
@@ -269,6 +269,12 @@ func (s *EtcdServer) run() {
 					}
 					s.applyConfChange(cc)
 					s.w.Trigger(int64(cc.ID), nil)
+				case raftpb.EntryClusterInit:
+					var ci raftpb.ClusterInit
+					if err := ci.Unmarshal(e.Data); err != nil {
+						panic("TODO: this is bad, what do we do about it?")
+					}
+					// TODO: apply clusterInit
 				default:
 					panic("unexpected entry type")
 				}

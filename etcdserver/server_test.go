@@ -387,10 +387,10 @@ func testServer(t *testing.T, ns uint64) {
 	for i := uint64(0); i < ns; i++ {
 		members[i] = i + 1
 	}
-
+	clusterid := uint64(1000)
 	for i := uint64(0); i < ns; i++ {
 		id := i + 1
-		n := raft.StartNode(id, members, 10, 1)
+		n := raft.StartNode(id, clusterid, members, 10, 1)
 		tk := time.NewTicker(10 * time.Millisecond)
 		defer tk.Stop()
 		srv := &EtcdServer{
@@ -457,7 +457,7 @@ func TestDoProposal(t *testing.T) {
 
 	for i, tt := range tests {
 		ctx, _ := context.WithCancel(context.Background())
-		n := raft.StartNode(0xBAD0, []uint64{0xBAD0}, 10, 1)
+		n := raft.StartNode(0xBAD0, 1000, []uint64{0xBAD0}, 10, 1)
 		st := &storeRecorder{}
 		tk := make(chan time.Time)
 		// this makes <-tk always successful, which accelerates internal clock
@@ -490,7 +490,7 @@ func TestDoProposal(t *testing.T) {
 func TestDoProposalCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// node cannot make any progress because there are two nodes
-	n := raft.StartNode(0xBAD0, []uint64{0xBAD0, 0xBAD1}, 10, 1)
+	n := raft.StartNode(0xBAD0, 1000, []uint64{0xBAD0, 0xBAD1}, 10, 1)
 	st := &storeRecorder{}
 	wait := &waitRecorder{}
 	srv := &EtcdServer{
@@ -526,7 +526,7 @@ func TestDoProposalStopped(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// node cannot make any progress because there are two nodes
-	n := raft.StartNode(0xBAD0, []uint64{0xBAD0, 0xBAD1}, 10, 1)
+	n := raft.StartNode(0xBAD0, 1000, []uint64{0xBAD0, 0xBAD1}, 10, 1)
 	st := &storeRecorder{}
 	tk := make(chan time.Time)
 	// this makes <-tk always successful, which accelarates internal clock
@@ -667,7 +667,7 @@ func TestSyncTrigger(t *testing.T) {
 // snapshot should snapshot the store and cut the persistent
 // TODO: node.Compact is called... we need to make the node an interface
 func TestSnapshot(t *testing.T) {
-	n := raft.StartNode(0xBAD0, []uint64{0xBAD0}, 10, 1)
+	n := raft.StartNode(0xBAD0, 1000, []uint64{0xBAD0}, 10, 1)
 	defer n.Stop()
 	st := &storeRecorder{}
 	p := &storageRecorder{}
@@ -698,7 +698,7 @@ func TestSnapshot(t *testing.T) {
 // Applied > SnapCount should trigger a SaveSnap event
 func TestTriggerSnap(t *testing.T) {
 	ctx := context.Background()
-	n := raft.StartNode(0xBAD0, []uint64{0xBAD0}, 10, 1)
+	n := raft.StartNode(0xBAD0, 1000, []uint64{0xBAD0}, 10, 1)
 	n.Campaign(ctx)
 	st := &storeRecorder{}
 	p := &storageRecorder{}
@@ -711,7 +711,7 @@ func TestTriggerSnap(t *testing.T) {
 	}
 
 	s.start()
-	for i := 0; uint64(i) < s.snapCount-1; i++ {
+	for i := 0; uint64(i) < s.snapCount-2; i++ {
 		s.Do(ctx, pb.Request{Method: "PUT", ID: 1})
 	}
 	time.Sleep(time.Millisecond)
@@ -719,12 +719,13 @@ func TestTriggerSnap(t *testing.T) {
 
 	gaction := p.Action()
 	// each operation is recorded as a Save
-	// BootstrapConfig/Nop + (SnapCount - 1) * Puts + Cut + SaveSnap = Save + (SnapCount - 1) * Save + Cut + SaveSnap
-	if len(gaction) != 2+int(s.snapCount) {
-		t.Fatalf("len(action) = %d, want %d", len(gaction), 2+int(s.snapCount))
+	// BootstrapConfig/Nop + (SnapCount - 2) * Puts + Cut + SaveSnap = Save + (SnapCount - 2) * Save + Cut + SaveSnap
+	wcnt := 1 + int(s.snapCount)
+	if len(gaction) != wcnt {
+		t.Fatalf("len(action) = %d, want %d", len(gaction), wcnt)
 	}
-	if !reflect.DeepEqual(gaction[11], action{name: "SaveSnap"}) {
-		t.Errorf("action = %s, want SaveSnap", gaction[11])
+	if !reflect.DeepEqual(gaction[wcnt-1], action{name: "SaveSnap"}) {
+		t.Errorf("action = %s, want SaveSnap", gaction[wcnt-1])
 	}
 }
 
@@ -1244,7 +1245,7 @@ func (cs *clusterStoreRecorder) Add(m Member) {
 }
 func (cs *clusterStoreRecorder) Get() Cluster {
 	cs.record(action{name: "Get"})
-	return nil
+	return Cluster{}
 }
 func (cs *clusterStoreRecorder) Remove(id uint64) {
 	cs.record(action{name: "Remove", params: []interface{}{id}})

@@ -120,21 +120,28 @@ type Node interface {
 // StartNode returns a new Node given a unique raft id, a list of raft peers, and
 // the election and heartbeat timeouts in units of ticks.
 // It also builds ConfChangeAddNode entry for each peer and puts them at the head of the log.
-func StartNode(id uint64, peers []uint64, election, heartbeat int) Node {
+func StartNode(id, clusterid uint64, peers []uint64, election, heartbeat int) Node {
 	n := newNode()
 	r := newRaft(id, peers, election, heartbeat)
 
-	ents := make([]pb.Entry, len(peers))
-	for i, peer := range peers {
+	ci := pb.ClusterInit{ClusterID: clusterid}
+	d, err := ci.Marshal()
+	if err != nil {
+		panic("unexpected marshal error")
+	}
+	e := pb.Entry{Type: pb.EntryClusterInit, Term: 1, Index: r.raftLog.lastIndex() + 1, Data: d}
+	r.raftLog.append(r.raftLog.lastIndex(), e)
+
+	for _, peer := range peers {
 		cc := pb.ConfChange{Type: pb.ConfChangeAddNode, NodeID: peer}
-		data, err := cc.Marshal()
+		d, err := cc.Marshal()
 		if err != nil {
 			panic("unexpected marshal error")
 		}
-		ents[i] = pb.Entry{Type: pb.EntryConfChange, Term: 1, Index: uint64(i + 1), Data: data}
+		e = pb.Entry{Type: pb.EntryConfChange, Term: 1, Index: r.raftLog.lastIndex() + 1, Data: d}
+		r.raftLog.append(r.raftLog.lastIndex(), e)
 	}
-	r.raftLog.append(0, ents...)
-	r.raftLog.committed = uint64(len(ents))
+	r.raftLog.committed = r.raftLog.lastIndex()
 
 	go n.run(r)
 	return &n

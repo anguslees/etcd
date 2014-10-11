@@ -14,6 +14,7 @@
 		Message
 		HardState
 		ConfChange
+		ClusterInit
 */
 package raftpb
 
@@ -34,17 +35,20 @@ var _ = math.Inf
 type EntryType int32
 
 const (
-	EntryNormal     EntryType = 0
-	EntryConfChange EntryType = 1
+	EntryNormal      EntryType = 0
+	EntryConfChange  EntryType = 1
+	EntryClusterInit EntryType = 2
 )
 
 var EntryType_name = map[int32]string{
 	0: "EntryNormal",
 	1: "EntryConfChange",
+	2: "EntryClusterInit",
 }
 var EntryType_value = map[string]int32{
-	"EntryNormal":     0,
-	"EntryConfChange": 1,
+	"EntryNormal":      0,
+	"EntryConfChange":  1,
+	"EntryClusterInit": 2,
 }
 
 func (x EntryType) Enum() *EntryType {
@@ -162,6 +166,15 @@ type ConfChange struct {
 func (m *ConfChange) Reset()         { *m = ConfChange{} }
 func (m *ConfChange) String() string { return proto.CompactTextString(m) }
 func (*ConfChange) ProtoMessage()    {}
+
+type ClusterInit struct {
+	ClusterID        uint64 `protobuf:"varint,1,req,name=clusterID" json:"clusterID"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *ClusterInit) Reset()         { *m = ClusterInit{} }
+func (m *ClusterInit) String() string { return proto.CompactTextString(m) }
+func (*ClusterInit) ProtoMessage()    {}
 
 func init() {
 	proto.RegisterEnum("raftpb.EntryType", EntryType_name, EntryType_value)
@@ -811,6 +824,63 @@ func (m *ConfChange) Unmarshal(data []byte) error {
 	}
 	return nil
 }
+func (m *ClusterInit) Unmarshal(data []byte) error {
+	l := len(data)
+	index := 0
+	for index < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if index >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[index]
+			index++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return code_google_com_p_gogoprotobuf_proto.ErrWrongType
+			}
+			for shift := uint(0); ; shift += 7 {
+				if index >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[index]
+				index++
+				m.ClusterID |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			index -= sizeOfWire
+			skippy, err := code_google_com_p_gogoprotobuf_proto.Skip(data[index:])
+			if err != nil {
+				return err
+			}
+			if (index + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[index:index+skippy]...)
+			index += skippy
+		}
+	}
+	return nil
+}
 func (m *Entry) Size() (n int) {
 	var l int
 	_ = l
@@ -889,6 +959,15 @@ func (m *ConfChange) Size() (n int) {
 	n += 1 + sovRaft(uint64(m.NodeID))
 	l = len(m.Context)
 	n += 1 + l + sovRaft(uint64(l))
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+func (m *ClusterInit) Size() (n int) {
+	var l int
+	_ = l
+	n += 1 + sovRaft(uint64(m.ClusterID))
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -1123,6 +1202,29 @@ func (m *ConfChange) MarshalTo(data []byte) (n int, err error) {
 	i++
 	i = encodeVarintRaft(data, i, uint64(len(m.Context)))
 	i += copy(data[i:], m.Context)
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+func (m *ClusterInit) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ClusterInit) MarshalTo(data []byte) (n int, err error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0x8
+	i++
+	i = encodeVarintRaft(data, i, uint64(m.ClusterID))
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
 	}
